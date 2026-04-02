@@ -1365,7 +1365,31 @@ function attachGatewayAuthHeader(req) {
 proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
 });
+// Proxy HTTP para hooks - llama al gateway internamente
+app.post("/hooks/:hookPath(*)", async (req, res) => {
+  try {
+    const hookPath = req.params.hookPath || "agent";
+    const body = req.body;
+    const token = (req.headers.authorization || "").replace("Bearer ", "").trim() 
+                  || req.headers["x-openclaw-token"] || "";
 
+    const response = await fetch(`http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}/hooks/${hookPath}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "x-openclaw-token": token,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await response.text();
+    res.status(response.status).type("application/json").send(text);
+  } catch (err) {
+    console.error("[hooks-proxy]", err);
+    res.status(502).json({ ok: false, error: String(err) });
+  }
+});
 app.use(requireDashboardAuth, async (req, res) => {
   // If not configured, force users to /setup for any non-setup routes.
   if (!isConfigured() && !req.path.startsWith("/setup")) {

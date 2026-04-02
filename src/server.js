@@ -1365,12 +1365,11 @@ function attachGatewayAuthHeader(req) {
 proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
 });
-// Proxy HTTP para hooks - llama al gateway internamente
-app.post("/hooks/:hookPath+", async (req, res) => {
+// Proxy HTTP para hooks
+async function hooksProxy(req, res) {
   try {
-    const hookPath = req.params.hookPath || "agent";
-    const body = req.body;
-    const token = (req.headers.authorization || "").replace("Bearer ", "").trim() 
+    const hookPath = req.path.replace(/^\/hooks\//, "");
+    const token = (req.headers.authorization || "").replace("Bearer ", "").trim()
                   || req.headers["x-openclaw-token"] || "";
 
     const response = await fetch(`http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}/hooks/${hookPath}`, {
@@ -1380,7 +1379,7 @@ app.post("/hooks/:hookPath+", async (req, res) => {
         "Authorization": `Bearer ${token}`,
         "x-openclaw-token": token,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(req.body),
     });
 
     const text = await response.text();
@@ -1389,7 +1388,11 @@ app.post("/hooks/:hookPath+", async (req, res) => {
     console.error("[hooks-proxy]", err);
     res.status(502).json({ ok: false, error: String(err) });
   }
-});
+}
+
+app.post("/hooks/agent", hooksProxy);
+app.post("/hooks/wake", hooksProxy);
+app.post("/hooks/gmail", hooksProxy);
 app.use(requireDashboardAuth, async (req, res) => {
   // If not configured, force users to /setup for any non-setup routes.
   if (!isConfigured() && !req.path.startsWith("/setup")) {

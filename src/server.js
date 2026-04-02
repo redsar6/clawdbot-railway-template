@@ -1366,9 +1366,9 @@ proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
 });
 // Proxy HTTP para hooks - llama al gateway internamente
-app.post("/hooks/*", async (req, res) => {
+app.post("/hooks/:hookPath+", async (req, res) => {
   try {
-    const hookPath = req.params[0] || "agent";
+    const hookPath = req.params.hookPath || "agent";
     const body = req.body;
     const token = (req.headers.authorization || "").replace("Bearer ", "").trim() 
                   || req.headers["x-openclaw-token"] || "";
